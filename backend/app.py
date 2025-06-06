@@ -2,9 +2,21 @@ from flask import Flask, request, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from functools import wraps
+from dotenv import load_dotenv
 import os
 
+load_dotenv()  # Isso carrega o .env para os os.environ
+
+print("GOOGLE_CLIENT_ID:", os.getenv("GOOGLE_CLIENT_ID"))
+print("GOOGLE_CLIENT_SECRET:", os.getenv("GOOGLE_CLIENT_SECRET"))
+
 app = Flask(__name__)
+
+# carregar para o app.config (necessário para o OAuth)
+app.config['GOOGLE_CLIENT_ID'] = os.getenv('GOOGLE_CLIENT_ID')
+app.config['GOOGLE_CLIENT_SECRET'] = os.getenv('GOOGLE_CLIENT_SECRET')
+app.config['FRONT_URL'] = os.getenv('FRONT_URL')
+
 # Configuração do Flask
 app.config.update(
     SECRET_KEY='uma-chave-qualquer',
@@ -81,6 +93,13 @@ def login_required(f):
 @app.route('/')
 def home():
     return jsonify({'msg': 'Backend do Compartilhamento de Links ativo'}), 200
+
+# Rota para verificar se o usuário está logado
+@app.route('/me')
+def who_am_i():
+    if 'user_email' not in session:
+        return jsonify({'logged_in': False}), 401
+    return jsonify({'logged_in': True, 'email': session['user_email']})
 
 # Rota de login
 @app.route('/login', methods=['POST'])
@@ -218,6 +237,16 @@ def delete_favorite(link_id):
     db.session.delete(fav)
     db.session.commit()
     return jsonify({'msg': 'Removido dos favoritos'}), 200
+#  login com Google ####################################################################################################################
+from login_google import bp_google, config_oauth
+config_oauth(app, db, User)
+app.register_blueprint(bp_google)
+########################################################################################################################################
+@app.route('/logout')
+@login_required
+def logout():
+    session.pop('user_email', None)
+    return jsonify({'msg': 'Logout realizado com sucesso'}), 200
 
 if __name__ == '__main__':
     with app.app_context():
