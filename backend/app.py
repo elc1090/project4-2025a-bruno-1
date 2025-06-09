@@ -4,11 +4,10 @@ from flask_cors import CORS
 from functools import wraps
 from dotenv import load_dotenv
 import os
+import requests
+from bs4 import BeautifulSoup
 
 load_dotenv()  # Isso carrega o .env para os os.environ
-
-print("GOOGLE_CLIENT_ID:", os.getenv("GOOGLE_CLIENT_ID"))
-print("GOOGLE_CLIENT_SECRET:", os.getenv("GOOGLE_CLIENT_SECRET"))
 
 app = Flask(__name__)
 
@@ -237,16 +236,57 @@ def delete_favorite(link_id):
     db.session.delete(fav)
     db.session.commit()
     return jsonify({'msg': 'Removido dos favoritos'}), 200
+
 #  login com Google ####################################################################################################################
 from login_google import bp_google, config_oauth
 config_oauth(app, db, User)
 app.register_blueprint(bp_google)
 ########################################################################################################################################
-@app.route('/logout')
-@login_required
-def logout():
-    session.pop('user_email', None)
-    return jsonify({'msg': 'Logout realizado com sucesso'}), 200
+
+# 3) ROTA NOVA: extract-keywords
+#    Recebe { "url": "https://algum.site/exemplo" }, extrai texto e chama Cortical.io “aberto”.
+@app.route('/extract-keywords', methods=['POST'])
+def extract_keywords():
+    data = request.get_json(force=True)
+    url = data.get('url')
+    if not url:
+        return jsonify({'error': 'URL é obrigatória'}), 400
+
+    try:
+        # --- 3.1) Buscar a página HTML ---
+        resp = requests.get(url, timeout=10)
+        resp.raise_for_status()
+        html = resp.text
+
+        # --- 3.2) Extrair texto limpo (remove <script> e <style>) ---
+        soup = BeautifulSoup(html, 'html.parser')
+        for tag in soup(['script', 'style']):
+            tag.decompose()
+        texto = soup.get_text(separator=' ', strip=True)
+
+        # --- 3.3) Enviar ao endpoint público da Cortical.io sem headers de autorização ---
+        payload = {
+            "text": texto
+            # se quiser, poderia passar "language": "pt" ou "en" para forçar idioma
+        }
+
+        cortical_resp = requests.post(
+            'https://api.cortical.io/nlp/keywords?limit=5',
+            json=payload,
+            timeout=15
+        )
+        # Verifica se a resposta foi bem-sucedida
+        cortical_resp.raise_for_status()
+        result = cortical_resp.json()
+   
+        return jsonify(result), 200
+
+    except requests.HTTPError as http_err:
+        status = http_err.response.status_code if hasattr(http_err.response, 'status_code') else 500
+        return jsonify({'error': f'Falha HTTP: {http_err}'}), status
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 if __name__ == '__main__':
     with app.app_context():
