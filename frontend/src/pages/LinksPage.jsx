@@ -6,6 +6,7 @@ import LinkForm from '../components/LinkForm'
 import SearchFiltered from '../components/SearchFiltered';
 import LoadMore from '../components/LoadMore'
 import Header from '../components/Header';
+import KeywordTags from '../components/KeywordTags'
 
 export default function LinksPage({ view }) {
   const [links, setLinks] = useState([])
@@ -269,6 +270,7 @@ export default function LinksPage({ view }) {
                   >
                     {l.url}
                   </a>
+                  <KeywordTags url={l.url} />
                   <div className="flex justify-between text-sm text-gray-500 mt-4">
                     <span>{addedAt}</span>
                     <span>{authorName}</span>
