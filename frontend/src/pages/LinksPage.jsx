@@ -270,7 +270,7 @@ export default function LinksPage({ view }) {
                   >
                     {l.url}
                   </a>
-                  <KeywordTags url={l.url} />
+                  <KeywordTags url={l.url} linkData={l} />
                   <div className="flex justify-between text-sm text-gray-500 mt-4">
                     <span>{addedAt}</span>
                     <span>{authorName}</span>

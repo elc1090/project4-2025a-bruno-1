@@ -2,11 +2,22 @@
 import { useEffect, useState } from 'react'
 import api from '../services/api'
 
-export default function KeywordTags({ url }) {
+export default function KeywordTags({ url, linkData }) {
   const [tags, setTags] = useState(null)   // null = ainda carregando
   const [error, setError] = useState(false)
 
-  useEffect(() => {
+   useEffect(() => {
+    // NOVO: Verificar se já temos tags no linkData
+    if (linkData?.tags) {
+      try {
+        const cachedTags = JSON.parse(linkData.tags);
+        setTags(cachedTags);
+        return; // Não faz requisição se já tem tags
+      } catch (err) {
+        console.error('Erro ao parsear tags cached:', err);
+      }
+    }
+
     let cancel = false
     async function fetchTags() {
       try {
@@ -20,7 +31,7 @@ export default function KeywordTags({ url }) {
     }
     fetchTags()
     return () => (cancel = true)
-  }, [url])
+  }, [url, linkData])
 
   if (error) return <p className="text-sm text-gray-500"></p>
   if (tags === null) return <p className="text-sm text-gray-400">carregando…</p>

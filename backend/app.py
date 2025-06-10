@@ -45,6 +45,7 @@ class Link(db.Model):
     data_adicao = db.Column(db.DateTime, server_default=db.func.now())
     confiabilidade = db.Column(db.Float, nullable=True)
     user_email     = db.Column(db.String(120), nullable=False)
+    tags = db.Column(db.Text, nullable=True) 
 
     def to_dict(self):
         return {
@@ -53,7 +54,8 @@ class Link(db.Model):
             'titulo': self.titulo,
             'data_adicao': self.data_adicao.isoformat(),
             'confiabilidade': self.confiabilidade,
-            'user_email': self.user_email
+            'user_email': self.user_email,
+            'tags': self.tags
         }
 
 # Modelo de Usuário
@@ -244,48 +246,63 @@ app.register_blueprint(bp_google)
 ########################################################################################################################################
 
 # 3) ROTA NOVA: extract-keywords
-#    Recebe { "url": "https://algum.site/exemplo" }, extrai texto e chama Cortical.io “aberto”.
+#    Recebe { "url": "https://algum.site/exemplo" }, extrai texto e chama Cortical.io "aberto".
 @app.route('/extract-keywords', methods=['POST'])
 def extract_keywords():
-    data = request.get_json(force=True)
-    url = data.get('url')
-    if not url:
-        return jsonify({'error': 'URL é obrigatória'}), 400
+   import json
+   data = request.get_json(force=True)
+   url = data.get('url')
+   if not url:
+       return jsonify({'error': 'URL é obrigatória'}), 400
 
-    try:
-        # --- 3.1) Buscar a página HTML ---
-        resp = requests.get(url, timeout=10)
-        resp.raise_for_status()
-        html = resp.text
+   # NOVO: Verificar se já temos tags para essa URL
+   link_existente = Link.query.filter_by(url=url).first()
+   if link_existente and link_existente.tags:
+       try:
+           tags_cached = json.loads(link_existente.tags)
+           return jsonify({'keywords': tags_cached}), 200
+       except:
+           pass  # Se der erro no JSON, continua para buscar na API
 
-        # --- 3.2) Extrair texto limpo (remove <script> e <style>) ---
-        soup = BeautifulSoup(html, 'html.parser')
-        for tag in soup(['script', 'style']):
-            tag.decompose()
-        texto = soup.get_text(separator=' ', strip=True)
+   try:
+       # --- 3.1) Buscar a página HTML ---
+       resp = requests.get(url, timeout=15)
+       resp.raise_for_status()
+       html = resp.text
 
-        # --- 3.3) Enviar ao endpoint público da Cortical.io sem headers de autorização ---
-        payload = {
-            "text": texto
-            # se quiser, poderia passar "language": "pt" ou "en" para forçar idioma
-        }
+       # --- 3.2) Extrair texto limpo (remove <script> e <style>) ---
+       soup = BeautifulSoup(html, 'html.parser')
+       for tag in soup(['script', 'style']):
+           tag.decompose()
+       texto = soup.get_text(separator=' ', strip=True)
 
-        cortical_resp = requests.post(
-            'https://api.cortical.io/nlp/keywords?limit=5',
-            json=payload,
-            timeout=15
-        )
-        # Verifica se a resposta foi bem-sucedida
-        cortical_resp.raise_for_status()
-        result = cortical_resp.json()
-   
-        return jsonify(result), 200
+       # --- 3.3) Enviar ao endpoint público da Cortical.io sem headers de autorização ---
+       payload = {
+           "text": texto
+           # se quiser, poderia passar "language": "pt" ou "en" para forçar idioma
+       }
 
-    except requests.HTTPError as http_err:
-        status = http_err.response.status_code if hasattr(http_err.response, 'status_code') else 500
-        return jsonify({'error': f'Falha HTTP: {http_err}'}), status
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+       cortical_resp = requests.post(
+           'https://api.cortical.io/nlp/keywords?limit=5',
+           json=payload,
+           timeout=15
+       )
+       # Verifica se a resposta foi bem-sucedida
+       cortical_resp.raise_for_status()
+       result = cortical_resp.json()
+
+       # NOVO: Salvar as tags no banco após obter da API
+       if link_existente:
+           link_existente.tags = json.dumps(result.get('keywords', []))
+           db.session.commit()
+  
+       return jsonify(result), 200
+
+   except requests.HTTPError as http_err:
+       status = http_err.response.status_code if hasattr(http_err.response, 'status_code') else 500
+       return jsonify({'error': f'Falha HTTP: {http_err}'}), status
+   except Exception as e:
+       return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':
