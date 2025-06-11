@@ -1,11 +1,13 @@
 from flask import Flask, request, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.dialects.mysql import JSON
 from flask_cors import CORS
 from functools import wraps
 from dotenv import load_dotenv
 import os
 import requests
 from bs4 import BeautifulSoup
+import json
 
 load_dotenv()  # Isso carrega o .env para os os.environ
 
@@ -45,9 +47,20 @@ class Link(db.Model):
     data_adicao = db.Column(db.DateTime, server_default=db.func.now())
     confiabilidade = db.Column(db.Float, nullable=True)
     user_email     = db.Column(db.String(120), nullable=False)
-    tags = db.Column(db.Text, nullable=True) 
+    tags = db.Column(JSON, nullable=True, default=[])
 
     def to_dict(self):
+         # Normaliza o campo tags para sempre ser lista de strings
+        raw_tags = self.tags
+        if isinstance(raw_tags, str):
+            try:
+                tags = json.loads(raw_tags)
+            except json.JSONDecodeError:
+                tags = []
+        elif isinstance(raw_tags, list):
+            tags = raw_tags
+        else:
+            tags = []
         return {
             'id': self.id,
             'url': self.url,
@@ -55,7 +68,7 @@ class Link(db.Model):
             'data_adicao': self.data_adicao.isoformat(),
             'confiabilidade': self.confiabilidade,
             'user_email': self.user_email,
-            'tags': self.tags
+            'tags': tags
         }
 
 # Modelo de Usuário
@@ -73,13 +86,6 @@ class User(db.Model):
             'data_criacao': self.data_criacao.isoformat()
         }
 
-
-# Dicionário em memória para usuários pré-cadastrados
-USERS = {
-    'bruno@example.com': '123',
-    'user2@example.com': '123',
-    'user3@example.com': '123'
-}
 
 # Decorator para proteger rotas
 def login_required(f):
@@ -154,11 +160,12 @@ def create_link():
     data = request.get_json(force=True)
     url = data.get('url')
     titulo = data.get('titulo')
+    tags = data.get('tags', [])
     user_email=session['user_email']
     if not url or not titulo:
         return jsonify({'erro': 'URL e título são obrigatórios'}), 400
 
-    novo = Link(url=url, titulo=titulo, user_email=user_email)
+    novo = Link(url=url, titulo=titulo, user_email=user_email, tags=json.dumps(tags) if tags else None)
     db.session.add(novo)
     db.session.commit()
     return jsonify({'id': novo.id}), 201
@@ -170,6 +177,8 @@ def update_link(id):
     data = request.get_json(force=True)
     link.url = data.get('url', link.url)
     link.titulo = data.get('titulo', link.titulo)
+    if 'tags' in data:
+        link.tags = json.dumps(data.get('tags', [])) if data.get('tags') else None
     db.session.commit()
     return jsonify({'msg': 'Link atualizado com sucesso'})
 
@@ -246,63 +255,67 @@ app.register_blueprint(bp_google)
 ########################################################################################################################################
 
 # 3) ROTA NOVA: extract-keywords
-#    Recebe { "url": "https://algum.site/exemplo" }, extrai texto e chama Cortical.io "aberto".
 @app.route('/extract-keywords', methods=['POST'])
 def extract_keywords():
-   import json
-   data = request.get_json(force=True)
-   url = data.get('url')
-   if not url:
-       return jsonify({'error': 'URL é obrigatória'}), 400
+    data = request.get_json(force=True)
+    url = data.get('url')
+    if not url:
+        return jsonify({'error': 'URL é obrigatória'}), 400
 
-   # NOVO: Verificar se já temos tags para essa URL
-   link_existente = Link.query.filter_by(url=url).first()
-   if link_existente and link_existente.tags:
-       try:
-           tags_cached = json.loads(link_existente.tags)
-           return jsonify({'keywords': tags_cached}), 200
-       except:
-           pass  # Se der erro no JSON, continua para buscar na API
+    # 1) Verifica cache no banco
+    link_existente = Link.query.filter_by(url=url).first()
+    if link_existente and link_existente.tags is not None:
+        # tags já vem como list ou string JSON
+        raw = link_existente.tags
+        if isinstance(raw, str):
+            try:
+                raw = json.loads(raw)
+            except json.JSONDecodeError:
+                raw = []
+        if isinstance(raw, list):
+            return jsonify({'keywords': raw}), 200
 
-   try:
-       # --- 3.1) Buscar a página HTML ---
-       resp = requests.get(url, timeout=15)
-       resp.raise_for_status()
-       html = resp.text
+    try:
+        # 2) Busca HTML e extrai texto
+        resp = requests.get(url, timeout=15)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        for t in soup(['script', 'style']):
+            t.decompose()
+        texto = soup.get_text(separator=' ', strip=True)
 
-       # --- 3.2) Extrair texto limpo (remove <script> e <style>) ---
-       soup = BeautifulSoup(html, 'html.parser')
-       for tag in soup(['script', 'style']):
-           tag.decompose()
-       texto = soup.get_text(separator=' ', strip=True)
+        # 3) Chama Cortical.io (limita a 5 keywords)
+        payload = {"text": texto}
+        cortical_resp = requests.post(
+            'https://api.cortical.io/nlp/keywords?limit=5',
+            json=payload,
+            timeout=15
+        )
+        cortical_resp.raise_for_status()
+        result = cortical_resp.json()
 
-       # --- 3.3) Enviar ao endpoint público da Cortical.io sem headers de autorização ---
-       payload = {
-           "text": texto
-           # se quiser, poderia passar "language": "pt" ou "en" para forçar idioma
-       }
+        print(f"Resultado da API: {result}")
 
-       cortical_resp = requests.post(
-           'https://api.cortical.io/nlp/keywords?limit=5',
-           json=payload,
-           timeout=15
-       )
-       # Verifica se a resposta foi bem-sucedida
-       cortical_resp.raise_for_status()
-       result = cortical_resp.json()
+        # 4) Extrai só o campo 'word' e salva no banco
+        raw_keywords = result.get('keywords', [])
+        words = [
+            item['word'] for item in raw_keywords
+            if isinstance(item, dict) and 'word' in item
+        ]
 
-       # NOVO: Salvar as tags no banco após obter da API
-       if link_existente:
-           link_existente.tags = json.dumps(result.get('keywords', []))
-           db.session.commit()
-  
-       return jsonify(result), 200
+        if link_existente:
+            link_existente.tags = words
+            db.session.commit()
 
-   except requests.HTTPError as http_err:
-       status = http_err.response.status_code if hasattr(http_err.response, 'status_code') else 500
-       return jsonify({'error': f'Falha HTTP: {http_err}'}), status
-   except Exception as e:
-       return jsonify({'error': str(e)}), 500
+        # 5) Retorna apenas o array de strings
+        return jsonify({'keywords': words}), 200
+
+    except requests.HTTPError as http_err:
+        status = getattr(http_err.response, 'status_code', 500)
+        return jsonify({'error': f'Falha HTTP: {http_err}'}), status
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 
 if __name__ == '__main__':

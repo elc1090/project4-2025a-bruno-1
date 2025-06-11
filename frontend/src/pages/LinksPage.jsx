@@ -17,10 +17,8 @@ export default function LinksPage({ view }) {
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportTarget, setReportTarget] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterBy, setFilterBy] = useState('title'); 
   const [favoritedIds, setFavoritedIds] = useState(new Set());
   const [visibleCount, setVisibleCount] = useState(6);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   // Pega o e‑mail do usuário logado em localStorage
   const userEmail = localStorage.getItem('userEmail') || 'Usuário'
@@ -45,9 +43,67 @@ export default function LinksPage({ view }) {
   };
 
   useEffect(() => {
-    loadLinks();
-    loadFavorited();
-  }, [view]); // toda vez que mudar “view” (all ou mine), recarrega lista e favoritos
+  async function loadAndTag() {
+    try {
+      // 1) pega lista bruta
+      const { data } = await api.get(endpoint)
+      setLinks(data)
+
+      // 2) para cada link que ainda não foi processado (tags null/[] ou ['null'])
+      data
+        .filter(l => {
+          const t = l.tags
+          return !Array.isArray(t)
+            || t.length === 0
+            || (t.length === 1 && t[0] === 'null')
+        })
+        .forEach(async (l) => {
+          try {
+            // extrai keywords
+            const res = await api.post('/extract-keywords', { url: l.url })
+            const kws = (Array.isArray(res.data.keywords) ? res.data.keywords : [])
+              .slice(0, 5)
+              .map(item => typeof item === 'string' ? item : item.word)
+              .filter(Boolean)
+
+            // sentinela se não vier nada
+            const tagsToSave = kws.length > 0 ? kws : ['null']
+
+            // atualiza no backend e no state
+            await api.put(`/links/${l.id}`, { tags: tagsToSave })
+            setLinks(prev =>
+              prev.map(x =>
+                x.id === l.id
+                  ? { ...x, tags: tagsToSave }
+                  : x
+              )
+            )
+          } catch (err) {
+            console.error(`erro ao extrair/atualizar tags do link ${l.url}:`, err)
+
+            // marca sentinel no backend
+            await api.put(`/links/${l.id}`, { tags: ['null'] }).catch(e =>
+              console.error(`falha ao gravar sentinel para ${l.url}:`, e)
+            )
+            // e atualiza no state
+            setLinks(prev =>
+              prev.map(x =>
+                x.id === l.id
+                  ? { ...x, tags: ['null'] }
+                  : x
+              )
+            )
+          }
+        })
+    } catch (err) {
+      console.error('falha ao carregar lista de links:', err)
+    }
+  }
+
+  loadAndTag()
+}, [view])
+
+
 
     /********** FUNÇÕES DE FAVORITO/DESFAVORITO **********/
   const handleToggleFavorite = async (linkId) => {
@@ -117,24 +173,34 @@ export default function LinksPage({ view }) {
     closeReportModal();
   };
 
-  // Filta os links com base no termo de busca e no tipo de filtro
-  const filteredLinks = links.filter((l) => {
-    const term = searchTerm.toLowerCase().trim();
-    if (!term) return true;
+// Filtro de links: pesquisa por título, autor, data ou tags
+const filteredLinks = links.filter((l) => {
+  const term = searchTerm.toLowerCase().trim();
+  if (!term) return true;
 
-    if (filterBy === 'title') {
-      return l.titulo.toLowerCase().includes(term);
-    }
-    if (filterBy === 'user') {
-      const authorName = l.user_email.split('@')[0].toLowerCase();
-      return authorName.includes(term);
-    }
-    if (filterBy === 'date') {
-      const dateStr = new Date(l.data_adicao).toLocaleDateString('pt-BR');
-      return dateStr.includes(term);
-    }
-    return true;
-  });
+  // nome do autor (antes do @)
+  const author = l.user_email?.split('@')[0] ?? '';
+  // data no formato DD/MM/AAAA
+  const dateStr = new Date(l.data_adicao).toLocaleDateString('pt-BR');
+  // tags – ajusta caso venham como array ou string
+  const tags = Array.isArray(l.tags)
+    ? l.tags.join(' ')
+    : (l.tags || '');
+
+  // transforma todos os campos em lower case p/ busca
+  const haystack = [
+    l.titulo,
+    l.url,
+    author,
+    dateStr,
+    tags,
+  ]
+    .filter(Boolean)
+    .map((s) => s.toString().toLowerCase())
+    .join(' ');
+
+  return haystack.includes(term);
+});
 
   // Define o número de links a serem exibidos por vez
   const visibleLinks = filteredLinks.slice(0, visibleCount);
@@ -154,7 +220,6 @@ export default function LinksPage({ view }) {
         userEmail={userEmail}
         onLogout={handleLogout}
       />
-      {/* Barra de pesquisa e filtro */}
       {/* Conteúdo */}
       <main className="flex-1 w-full px-4 md:px-6 lg:px-8 py-8 max-w-[1280px] mx-auto">
         {/* Formulário de criação */}
@@ -165,10 +230,8 @@ export default function LinksPage({ view }) {
         <h2 className="text-2xl font-semibold text-gray-800 mb-6 text-center">
           {view === 'mine' ? 'Meus Links' : 'Todos os Links'}
         </h2>
-        {/* Filtro e pesquisa */}
+        {/* Barra de pesquisa e filtro */}
         <SearchFiltered
-          filterBy={filterBy}
-          onFilterChange={setFilterBy}
           searchTerm={searchTerm}
           onSearchTermChange={setSearchTerm}
           onClear={() => setSearchTerm('')}
