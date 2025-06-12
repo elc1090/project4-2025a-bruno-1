@@ -50,8 +50,8 @@ export default function LanguageDetection({ url, linkId, onLanguage }) {
 
   return (
     <span
-      className="text-sm text-green-600"
-      title="Linguagem"
+      className="text-sm"
+      title="Idioma"
     >
       {language.toUpperCase()}
     </span>

@@ -8,6 +8,7 @@ import LoadMore from '../components/LoadMore'
 import Header from '../components/Header';
 import KeywordTags from '../components/KeywordTags'
 import LanguageDetection from '../components/LanguageDetection';
+import { mapLanguageCode, languageMap } from '../utils/languageUtils'
 
 export default function LinksPage({ view }) {
   const [links, setLinks] = useState([])
@@ -20,6 +21,8 @@ export default function LinksPage({ view }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [favoritedIds, setFavoritedIds] = useState(new Set());
   const [visibleCount, setVisibleCount] = useState(6);
+  const [selectedLanguage, setSelectedLanguage] = useState('all')
+
 
   // Pega o e‑mail do usuário logado em localStorage
   const userEmail = localStorage.getItem('userEmail') || 'Usuário'
@@ -174,47 +177,28 @@ export default function LinksPage({ view }) {
     closeReportModal();
   };
 
-// Filtro de links: pesquisa por título, autor, data ou tags
-const filteredLinks = links.filter((l) => {
-  const term = searchTerm.toLowerCase().trim();
-  if (!term) return true;
+  // Filtro de busca + idioma
+  const filteredLinks = links.filter(l => {
+    const term = searchTerm.toLowerCase().trim()
+    if (!term) return true
+    const author = l.user_email?.split('@')[0] ?? ''
+    const date = new Date(l.data_adicao).toLocaleDateString('pt-BR')
+    const tags = Array.isArray(l.tags) ? l.tags.join(' ') : l.tags ?? ''
+    return [l.titulo, l.url, author, date, tags]
+      .filter(Boolean).map(s => s.toLowerCase()).join(' ').includes(term)
+  }).filter(l => selectedLanguage === 'all' || l.language === selectedLanguage)
 
-  // nome do autor (antes do @)
-  const author = l.user_email?.split('@')[0] ?? '';
-  // data no formato DD/MM/AAAA
-  const dateStr = new Date(l.data_adicao).toLocaleDateString('pt-BR');
-  // tags – ajusta caso venham como array ou string
-  const tags = Array.isArray(l.tags)
-    ? l.tags.join(' ')
-    : (l.tags || '');
+  const visibleLinks = filteredLinks.slice(0, visibleCount)
 
-  // transforma todos os campos em lower case p/ busca
-  const haystack = [
-    l.titulo,
-    l.url,
-    author,
-    dateStr,
-    tags,
-  ]
-    .filter(Boolean)
-    .map((s) => s.toString().toLowerCase())
-    .join(' ');
-
-  return haystack.includes(term);
-});
-
-  // Define o número de links a serem exibidos por vez
-  const visibleLinks = filteredLinks.slice(0, visibleCount);
+  const availableLangs = ['all', ...new Set(links.map(l => l.language).filter(Boolean))]
 
   // Função para carregar mais links
   const handleLoadMore = () => {
     setVisibleCount((prev) => prev + 6);
   };
 
-
   return (
     <div className="w-full min-h-screen flex flex-col bg-gray-100">
-      {/* HEADER */}
       {/* Header padronizado */}
       <Header
         activeView={view}          
@@ -230,12 +214,20 @@ const filteredLinks = links.filter((l) => {
         <h2 className="text-2xl font-semibold text-gray-800 mb-6 text-center">
           {view === 'mine' ? 'Meus Links' : 'Todos os Links'}
         </h2>
-        {/* Barra de pesquisa e filtro */}
-        <SearchFiltered
-          searchTerm={searchTerm}
-          onSearchTermChange={setSearchTerm}
-          onClear={() => setSearchTerm('')}
-        />
+        { /* Filtros de busca e idioma */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 space-y-4 sm:space-y-0">
+          <SearchFiltered searchTerm={searchTerm} onSearchTermChange={setSearchTerm} onClear={() => setSearchTerm('')} />
+          <div>
+            <label className="mr-2 text-sm font-medium text-gray-900">Filtrar idioma:</label>
+            <select value={selectedLanguage} onChange={e => setSelectedLanguage(e.target.value)} className="border rounded p-1 text-sm">
+              {availableLangs.map(code => (
+                <option key={code} value={code}>
+                  {code === 'all' ? 'Todos' : mapLanguageCode(code)}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
         {/* Grid de cards */}
         {filteredLinks.length === 0 ? (
           <p className="text-center text-gray-500 mt-10">
