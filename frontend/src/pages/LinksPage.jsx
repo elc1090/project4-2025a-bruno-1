@@ -7,6 +7,7 @@ import SearchFiltered from '../components/SearchFiltered';
 import LoadMore from '../components/LoadMore'
 import Header from '../components/Header';
 import KeywordTags from '../components/KeywordTags'
+import LanguageDetection from '../components/LanguageDetection';
 
 export default function LinksPage({ view }) {
   const [links, setLinks] = useState([])
@@ -226,7 +227,6 @@ const filteredLinks = links.filter((l) => {
         <div className="bg-white rounded-lg shadow p-6 mb-10 border border-gray-200">
           <LinkForm onSuccess={loadLinks} />
         </div>
-        /* Título da lista */
         <h2 className="text-2xl font-semibold text-gray-800 mb-6 text-center">
           {view === 'mine' ? 'Meus Links' : 'Todos os Links'}
         </h2>
@@ -337,6 +337,12 @@ const filteredLinks = links.filter((l) => {
                   <div className="flex justify-between text-sm text-gray-500 mt-4">
                     <span>{addedAt}</span>
                     <span>{authorName}</span>
+                    <LanguageDetection
+                      url={l.url}
+                      linkId={l.id}
+                      onLanguage={lang => {
+                      }}
+                    />
                   </div>
                   {view === 'mine' && (
                     <div className="flex justify-end space-x-4 mt-4">

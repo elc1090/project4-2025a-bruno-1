@@ -47,6 +47,7 @@ class Link(db.Model):
     data_adicao = db.Column(db.DateTime, server_default=db.func.now())
     confiabilidade = db.Column(db.Float, nullable=True)
     user_email     = db.Column(db.String(120), nullable=False)
+    language = db.Column(db.String(20), nullable=True, default=None)
     tags = db.Column(JSON, nullable=True, default=[])
 
     def to_dict(self):
@@ -68,6 +69,7 @@ class Link(db.Model):
             'data_adicao': self.data_adicao.isoformat(),
             'confiabilidade': self.confiabilidade,
             'user_email': self.user_email,
+            'language': self.language,
             'tags': tags
         }
 
@@ -177,6 +179,8 @@ def update_link(id):
     data = request.get_json(force=True)
     link.url = data.get('url', link.url)
     link.titulo = data.get('titulo', link.titulo)
+    if 'language' in data:
+        link.language = data.get('language') or None
     if 'tags' in data:
         link.tags = json.dumps(data.get('tags', [])) if data.get('tags') else None
     db.session.commit()
@@ -254,7 +258,6 @@ config_oauth(app, db, User)
 app.register_blueprint(bp_google)
 ########################################################################################################################################
 
-# 3) ROTA NOVA: extract-keywords
 @app.route('/extract-keywords', methods=['POST'])
 def extract_keywords():
     data = request.get_json(force=True)
@@ -316,6 +319,59 @@ def extract_keywords():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/detect-language', methods=['POST'])
+def detect_language():
+    data = request.get_json(force=True)
+    url = data.get('url')
+    if not url:
+        return jsonify({'error': 'URL é obrigatória'}), 400
+
+    #  Verifica cache no banco
+    link = Link.query.filter_by(url=url).first()
+    if link and link.language is not None:
+        return jsonify({'language_code': link.language}), 200
+
+    try:
+        # Busca HTML e extrai texto
+        resp = requests.get(url, timeout=15)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        for t in soup(['script', 'style']):
+            t.decompose()
+        texto = soup.get_text(separator=' ', strip=True)
+
+        # Chama Cortical API de detecção de idioma
+        payload = { "text": texto }
+        cortical_resp = requests.post(
+            'https://api.cortical.io/nlp/language',
+            json=payload,
+            timeout=15
+        )
+        cortical_resp.raise_for_status()
+        result = cortical_resp.json()
+        print(f"Resultado da API: {result}")
+
+        # Extrai o código de idioma (campo 'language' na resposta)
+        lang_code = result.get('language') or 'und'
+
+        # Persiste no banco
+        if link:
+            link.language = lang_code
+        else:
+            # opcional: criar novo registro se quiser
+            link = Link(url=url, titulo='', user_email=session.get('user_email', ''), language=lang_code)
+            db.session.add(link)
+        db.session.commit()
+
+        # Retorna o código de idioma
+        return jsonify({'language_code': lang_code}), 200
+
+    except requests.HTTPError as http_err:
+        status = getattr(http_err.response, 'status_code', 500)
+        return jsonify({'error': f'Falha HTTP: {http_err}'}), status
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':
