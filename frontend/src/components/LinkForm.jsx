@@ -17,7 +17,7 @@ export default function LinkForm({ onSuccess }) {
       setUrl('');
       setTitulo('');
       setErro('');
-      onSuccess(); // notifica para recarregar a lista
+      onSuccess && onSuccess({ url, titulo });
     } catch (err) {
       setErro(err.response?.data?.erro || 'Erro ao criar link');
     }

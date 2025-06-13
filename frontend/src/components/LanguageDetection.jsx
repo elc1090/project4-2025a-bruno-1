@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import api from '../services/api'; // ajuste o caminho conforme seu setup
+import { useEffect, useState } from 'react';
+import api from '../services/api'; 
 
-const languageCache = {};
+export const languageCache = {};
 
 export default function LanguageDetection({ url, linkId, onLanguage }) {
   const [language, setLanguage] = useState(null);
@@ -20,7 +20,7 @@ export default function LanguageDetection({ url, linkId, onLanguage }) {
     // se não tiver, omitimos essa etapa e vamos direto para fetch
 
     // 3) faz requisição à Cortical API
-    api.post('/detect-language', { url })
+    api.post('/detect-language', { id: linkId, url })
       .then(res => {
         const lang = res.data.language_code || 'und';
         languageCache[url] = lang;

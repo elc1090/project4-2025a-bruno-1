@@ -9,6 +9,7 @@ import requests
 from bs4 import BeautifulSoup
 import json
 
+
 load_dotenv()  # Isso carrega o .env para os os.environ
 
 app = Flask(__name__)
@@ -172,6 +173,20 @@ def create_link():
     db.session.commit()
     return jsonify({'id': novo.id}), 201
 
+@app.route('/links/<int:id>', methods=['GET'])
+@login_required
+def get_link(id):
+    l = Link.query.get_or_404(id)
+    return jsonify({
+        'id': l.id,
+        'url': l.url,
+        'titulo': l.titulo,
+        'tags': json.loads(l.tags) if l.tags else [],
+        'language': l.language,
+        'confiabilidade': l.confiabilidade
+    }), 200
+
+
 @app.route('/links/<int:id>', methods=['PUT'])
 @login_required
 def update_link(id):
@@ -266,7 +281,7 @@ def extract_keywords():
         return jsonify({'error': 'URL é obrigatória'}), 400
 
     # 1) Verifica cache no banco
-    link_existente = Link.query.filter_by(url=url).first()
+    link_existente = Link.query.get(data.get('id'))
     if link_existente and link_existente.tags is not None:
         # tags já vem como list ou string JSON
         raw = link_existente.tags
@@ -297,8 +312,6 @@ def extract_keywords():
         cortical_resp.raise_for_status()
         result = cortical_resp.json()
 
-        print(f"Resultado da API: {result}")
-
         # 4) Extrai só o campo 'word' e salva no banco
         raw_keywords = result.get('keywords', [])
         words = [
@@ -327,7 +340,7 @@ def detect_language():
         return jsonify({'error': 'URL é obrigatória'}), 400
 
     #  Verifica cache no banco
-    link = Link.query.filter_by(url=url).first()
+    link = Link.query.get(data.get('id'))
     if link and link.language is not None:
         return jsonify({'language_code': link.language}), 200
 
@@ -349,7 +362,6 @@ def detect_language():
         )
         cortical_resp.raise_for_status()
         result = cortical_resp.json()
-        print(f"Resultado da API: {result}")
 
         # Extrai o código de idioma (campo 'language' na resposta)
         lang_code = result.get('language') or 'und'
@@ -372,6 +384,70 @@ def detect_language():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+import logging
+from requests.exceptions import HTTPError
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+@app.route('/compare-reliability', methods=['POST'])
+@login_required
+def compare_reliability():
+    data  = request.get_json(force=True)
+    url   = data.get('url')
+    title = data.get('title')
+    if not url or not title:
+        return jsonify({'error': 'URL e título são obrigatórios'}), 400
+
+    # 1) Obter conteúdo da URL
+    try:
+        resp = requests.get(url, timeout=15)
+        resp.raise_for_status()
+    except Exception as e:
+        logger.error(f"Falha ao buscar URL {url}: {e}")
+        return jsonify({'error': f'Não consegui buscar URL: {str(e)}'}), 500
+
+    # 2) Extrair texto bruto, limitando tamanho
+    soup = BeautifulSoup(resp.text, 'html.parser')
+    for tag in soup(['script','style']):
+        tag.decompose()
+    snippet = soup.get_text(separator=' ', strip=True)[:10000]
+
+    # 3) Montar payload conforme schema da Cortical
+    payload  = [
+        {"text": title},
+        {"text": snippet}
+    ]
+    endpoint = f'https://api.cortical.io/nlp/compare'
+
+    # 4) Chamar a API
+    try:
+        cortical = requests.post(endpoint, json=payload, timeout=20)
+        # Se Cortical retorna 422, trata como sem confiabilidade
+        if cortical.status_code == 422:
+            logger.info(f"Cortical 422 para {url}: {cortical.text}")
+            return jsonify({'confiabilidade': None}), 200
+        cortical.raise_for_status()
+        body       = cortical.json()
+        similarity = body.get('similarity')
+        if similarity is None:
+            raise ValueError(f"Resposta inesperada: {body}")
+    except HTTPError as http_err:
+        detail = getattr(cortical, 'text', str(http_err))
+        logger.error(f"Cortical Bad Request [{cortical.status_code}]: {detail}")
+        return jsonify({'error': 'Cortical Bad Request', 'detail': detail}), cortical.status_code
+    except Exception as e:
+        logger.error(f"Erro interno compare_reliability: {e}")
+        return jsonify({'error': 'Falha interna', 'detail': str(e)}), 500
+
+    # 5) Persistir no banco
+    link = Link.query.get(data.get('id'))
+    if link and link.titulo:
+        link.confiabilidade = float(similarity)
+        db.session.commit()
+
+    return jsonify({'confiabilidade': similarity}), 200
+
 
 
 if __name__ == '__main__':
