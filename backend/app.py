@@ -9,7 +9,6 @@ import requests
 from bs4 import BeautifulSoup
 import json
 
-
 load_dotenv()  # Isso carrega o .env para os os.environ
 
 app = Flask(__name__)
@@ -29,12 +28,17 @@ app.config.update(
 # permite que o front acesse o back e envie cookies de sessão
 CORS(app, supports_credentials=True, origins=[
     "http://localhost:5173",
-    "https://project3-2025a-bruno-frontend.onrender.com"
+    "https://project3-2025a-bruno-backend.onrender.com"
 ])
 
-# Configuração da conexão com MySQL 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://root:Brunop10%40@localhost/project3'
-#os.environ.get('DATABASE_URL').replace('mysql://', 'mysql+pymysql://')
+# Usa DATABASE_URL do ambiente (Render, Railway etc). Em dev cai no .env:
+DATABASE_URL = os.getenv('DATABASE_URL',
+    'mysql://root:Brunop10%40@localhost/project3'
+)
+# SQLAlchemy + PyMySQL
+app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL.replace(
+    'mysql://', 'mysql+pymysql://'
+)
 
 db = SQLAlchemy(app)
 
