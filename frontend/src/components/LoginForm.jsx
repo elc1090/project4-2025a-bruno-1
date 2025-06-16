@@ -2,12 +2,14 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
 import { useNavigate } from 'react-router-dom';
+import { useLoading } from '../utils/LoadingContext';
 
 export default function LoginForm({onLogin}) {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState('');
   const navigate = useNavigate();
+  const { setIsLoading } = useLoading()
 
   // Reseta campos toda vez que o componente monta
   useEffect(() => {
@@ -18,26 +20,18 @@ export default function LoginForm({onLogin}) {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    setErro('');
+    setIsLoading(true);
     try {
       await api.post('/login', { email, senha });
-      console.log('Login bem-sucedido');
       localStorage.setItem('loggedIn', 'true');
-      localStorage.setItem('userEmail', email)
-      console.log('localStorage setado');
-      try {
-        onLogin();
-      } catch (e) {
-        console.error('Erro ao chamar onLogin:', e);
-      }
-      console.log('onLogin chamado');
-      // Aguarde um ciclo para garantir re-render
-      setTimeout(() => {
-        navigate('/links', { replace: true });
-        console.log('Navegando para /links');
-      }, 0);
-
+      localStorage.setItem('userEmail', email);
+      onLogin();
+      navigate('/links', { replace: true });
     } catch (err) {
       setErro(err.response?.data?.erro || 'Erro no login');
+    } finally {
+      setIsLoading(false);            
     }
   }
 

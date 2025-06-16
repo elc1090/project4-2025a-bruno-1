@@ -16,11 +16,15 @@ import LinksPage from './pages/LinksPage'
 import FavoritesPage from './pages/FavoritesPage'
 import Logout from './components/Logout'
 
+import { LoadingProvider, useLoading } from './utils/LoadingContext'
+import LoadingModal from './components/LoadingModal'
+
 import './App.css'
 
 function AppRoutes({ isLogged, setIsLogged, userEmail, setUserEmail }) {
   const location = useLocation()
   const navigate = useNavigate()
+  const { setIsLoading } = useLoading()
 
   // 1) Sincroniza isLogged se mudar em outra aba
   useEffect(() => {
@@ -51,10 +55,11 @@ function AppRoutes({ isLogged, setIsLogged, userEmail, setUserEmail }) {
           localStorage.removeItem('userEmail')
         })
         .finally(() => {
+          setIsLoading(false)
           navigate('/links', { replace: true })
         })
     }
-  }, [location.search, setIsLogged, setUserEmail, navigate])
+  }, [location.search, setIsLogged, setUserEmail, navigate, setIsLoading])
 
   // 3) determina activeView pelo pathname
   const path = location.pathname
@@ -134,6 +139,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <LoadingModal visible={useLoading().isLoading} />
       <AppRoutes
         isLogged={isLogged}
         setIsLogged={setIsLogged}

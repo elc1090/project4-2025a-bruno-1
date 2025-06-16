@@ -5,24 +5,22 @@ import api from '../services/api'
 import SearchFiltered from '../components/SearchFiltered'
 import LoadMore from '../components/LoadMore'
 import Header from '../components/Header'
+import KeywordTags from '../components/KeywordTags'
+import LanguageDetection from '../components/LanguageDetection'
+import Reliability from '../components/Reliability'
+import { mapLanguageCode } from '../utils/languageUtils'
 
 export default function FavoritesPage({ onLogout }) {
   const [favorites, setFavorites] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
   const [filterBy, setFilterBy] = useState('title')
-  const [editingId, setEditingId] = useState(null)
-  const [editTitulo, setEditTitulo] = useState('')
-  const [editUrl, setEditUrl] = useState('')
+  const [selectedLanguage, setSelectedLanguage] = useState('all')
   const [visibleCount, setVisibleCount] = useState(6);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-
-  // Modal de denúncia 
   const [showReportModal, setShowReportModal] = useState(false)
   const [reportTarget, setReportTarget] = useState(null)
 
   // Pega o email do usuário logado
   const userEmail = localStorage.getItem('userEmail') || 'Usuário'
-
   const navigate = useNavigate()
 
   // Carrega apenas os links que o usuário favoritou
@@ -47,29 +45,6 @@ export default function FavoritesPage({ onLogout }) {
     navigate('/login')
   }
 
-  /**** EDIÇÃO INLINE ****/
-  const handleEditClick = (link) => {
-    setEditingId(link.id)
-    setEditTitulo(link.titulo)
-    setEditUrl(link.url)
-  }
-  const handleEditCancel = () => {
-    setEditingId(null)
-    setEditTitulo('')
-    setEditUrl('')
-  }
-  const handleEditSubmit = async (e) => {
-    e.preventDefault()
-    await api.put(`/links/${editingId}`, {
-      titulo: editTitulo,
-      url: editUrl
-    })
-    setEditingId(null)
-    setEditTitulo('')
-    setEditUrl('')
-    loadFavorites()
-  }
-
   /**** MODAL DE DENÚNCIA ****/
   const openReportModal = (link) => {
     setReportTarget(link)
@@ -89,19 +64,13 @@ export default function FavoritesPage({ onLogout }) {
     const term = searchTerm.toLowerCase().trim()
     if (!term) return true
 
-    if (filterBy === 'title') {
-      return l.titulo.toLowerCase().includes(term)
-    }
-    if (filterBy === 'user') {
-      const authorName = l.user_email.split('@')[0].toLowerCase()
-      return authorName.includes(term)
-    }
-    if (filterBy === 'date') {
-      const dateStr = new Date(l.data_adicao).toLocaleDateString('pt-BR')
-      return dateStr.includes(term)
-    }
-    return true
-  })
+    const author = l.user_email?.split('@')[0] ?? ''
+    const date = new Date(l.data_adicao).toLocaleDateString('pt-BR')
+    const tags = Array.isArray(l.tags) ? l.tags.join(' ') : l.tags ?? ''
+
+    return [l.titulo, l.url, author, date, tags]
+      .filter(Boolean).map(s => s.toLowerCase()).join(' ').includes(term)
+  }).filter(l => selectedLanguage === 'all' || l.language === selectedLanguage)
 
   // Define o número de links a serem exibidos por vez
   const visibleLinks = filteredFavs.slice(0, visibleCount);
@@ -110,6 +79,8 @@ export default function FavoritesPage({ onLogout }) {
   const handleLoadMore = () => {
     setVisibleCount((prev) => prev + 6);
   };
+
+  const availableLangs = ['all', ...new Set(favorites.map(l => l.language).filter(Boolean))]
 
   return (
     <div className="w-full min-h-screen flex flex-col bg-gray-100">
@@ -127,14 +98,25 @@ export default function FavoritesPage({ onLogout }) {
       <main className="flex-1 w-full px-6 md:px-8 lg:px-10 py-4 max-w-[1280px] mx-auto">
         <h2 className="text-2xl font-semibold text-gray-800 mb-6 text-center">Seus Favoritos</h2>
         
-        {/* -------- BUSCA -------- */}
-        <SearchFiltered
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 space-y-4 sm:space-y-0">
+          <SearchFiltered
             filterBy={filterBy}
             onFilterChange={setFilterBy}
             searchTerm={searchTerm}
             onSearchTermChange={setSearchTerm}
             onClear={() => setSearchTerm('')}
-        />
+          />
+          <div>
+            <label className="mr-2 text-sm font-medium text-gray-900">Filtrar idioma:</label>
+            <select value={selectedLanguage} onChange={e => setSelectedLanguage(e.target.value)} className="border rounded p-1 text-sm">
+              {availableLangs.map(code => (
+                <option key={code} value={code}>
+                  {code === 'all' ? 'Todos' : mapLanguageCode(code)}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
 
         {/* Grid de cards (favoritos) */}
         {filteredFavs.length === 0 ? (
@@ -152,46 +134,6 @@ export default function FavoritesPage({ onLogout }) {
                 hour: '2-digit',
                 minute: '2-digit',
               })
-
-              if (editingId === l.id) {
-                return (
-                  <div
-                    key={l.id}
-                    className="bg-white p-6 rounded-lg shadow-md border border-gray-200"
-                  >
-                    {/* EDIÇÃO INLINE */}
-                    <form onSubmit={handleEditSubmit} className="space-y-4">
-                      <input
-                        type="text"
-                        value={editTitulo}
-                        onChange={(e) => setEditTitulo(e.target.value)}
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500"
-                      />
-                      <input
-                        type="url"
-                        value={editUrl}
-                        onChange={(e) => setEditUrl(e.target.value)}
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500"
-                      />
-                      <div className="flex justify-end space-x-2">
-                        <button
-                          type="button"
-                          onClick={handleEditCancel}
-                          className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
-                        >
-                          Cancelar
-                        </button>
-                        <button
-                          type="submit"
-                          className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-                        >
-                          Salvar
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                )
-              }
 
               return (
                 <div
@@ -233,10 +175,29 @@ export default function FavoritesPage({ onLogout }) {
                     {l.url}
                   </a>
 
-                  {/* Data e autor */}
+                  {l.titulo && l.url && (<KeywordTags url={l.url} linkData={l} />)}
+
                   <div className="flex justify-between text-sm text-gray-500 mt-4">
                     <span>{addedAt}</span>
                     <span>{authorName}</span>
+                    {l.titulo && l.url && (
+                      <>
+                        <LanguageDetection
+                          key={`lang-${l.id}-${l.url}`}
+                          url={l.url}
+                          linkId={l.id}
+                          onLanguage={() => {}}
+                        />
+                        <Reliability
+                          key={`rel-${l.id}-${l.url}-${l.titulo}`}
+                          url={l.url}
+                          title={l.titulo}
+                          linkId={l.id}
+                          initialScore={l.confiabilidade}
+                          onUpdate={() => {}}
+                        />
+                      </>
+                    )}
                   </div>
                 </div>
               )
@@ -247,8 +208,7 @@ export default function FavoritesPage({ onLogout }) {
         hasMore={visibleCount < filteredFavs.length}
         onClick={handleLoadMore}
         />
-      </main>
-      
+      </main>     
 
       {/* -------- FOOTER -------- */}
       <footer className="bg-gray-900 text-gray-300 text-center p-6 w-full">
