@@ -8,6 +8,7 @@ import os
 import requests
 from bs4 import BeautifulSoup
 import json
+from werkzeug.security import generate_password_hash, check_password_hash
 
 load_dotenv()  # Isso carrega o .env para os os.environ
 
@@ -121,17 +122,17 @@ def login_user():
     data = request.get_json(force=True)
     email = data.get('email')
     senha = data.get('senha')
-    #if not email or not senha or USERS.get(email) != senha:
-    #    return jsonify({'erro': 'Credenciais inválidas'}), 401
     if not email or not senha:
         return jsonify({'erro': 'Email e senha são obrigatórios'}), 400
 
     usuario = User.query.filter_by(email=email).first()
-    if not usuario or usuario.senha != senha:  # Atualizar para hash no futuro
+    if usuario and check_password_hash(usuario.senha, senha):
+        session['user_email'] = usuario.email
+        return jsonify({'msg': 'Login bem-sucedido'}), 200
+
+    else:
         return jsonify({'erro': 'Credenciais inválidas'}), 401
 
-    session['user_email'] = email
-    return jsonify({'msg': 'Login realizado com sucesso'})
 
 @app.route('/login', methods=['GET'])
 def login_placeholder():
@@ -149,7 +150,8 @@ def register_user():
     if User.query.filter_by(email=email).first():
         return jsonify({'erro': 'Email já cadastrado'}), 409
 
-    novo_usuario = User(email=email, senha=senha)  # Senha deve ser hasheada em produção
+    hashed = generate_password_hash(senha)
+    novo_usuario = User(email=email, senha=hashed)
     db.session.add(novo_usuario)
     db.session.commit()
     return jsonify({'msg': 'Usuário registrado com sucesso'}), 201

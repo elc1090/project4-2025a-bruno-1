@@ -31,9 +31,12 @@ def config_oauth(app, db, User):
 
 @bp_google.route('/login/google')
 def login_google():
-    redirect_uri = url_for('bp_google.google_callback', _external=True)
+    redirect_uri = os.getenv(
+        'GOOGLE_REDIRECT_URI',
+        url_for('bp_google.google_callback', _external=True)
+    )
     print(">>> Redirect URI:", redirect_uri)
-    return oauth.google.authorize_redirect(redirect_uri)
+    return oauth.google.authorize_redirect(redirect_uri=redirect_uri)
 
 @bp_google.route('/auth/callback')
 def google_callback():
