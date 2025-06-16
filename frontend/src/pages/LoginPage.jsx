@@ -2,6 +2,8 @@
 import LoginForm from '../components/LoginForm';
 import { Link } from 'react-router-dom';
 
+const BACKEND_URL = import.meta.env.VITE_API_URL;
+
 export default function LoginPage({ onLogin }) {
   return (
     <main className="min-h-screen flex items-center justify-center bg-gradient-to-r from-blue-900 via-indigo-800 to-blue-700">
@@ -20,7 +22,7 @@ export default function LoginPage({ onLogin }) {
 
         {/* ---------- Botão “Entrar com Google” --------- */}
         <a
-          href="http://localhost:5000/login/google"
+          href={`${BACKEND_URL}/login/google`}
           className="w-full mb-5 flex items-center justify-center gap-3 px-5 py-3 rounded-xl bg-white text-gray-700 font-semibold shadow-md hover:shadow-lg transition-all duration-300 border border-gray-300 hover:bg-gray-100"
         >
           <img

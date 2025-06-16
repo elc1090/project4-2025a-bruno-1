@@ -6,3 +6,4 @@ flask-sqlalchemy
 pymysql
 python-dotenv
 werkzeug
+requests
