@@ -7,3 +7,4 @@ pymysql
 python-dotenv
 werkzeug
 requests
+beautifulsoup4
