@@ -1,3 +1,4 @@
+// src/components/LinkForm.jsx
 import { useState } from 'react';
 import api from '../services/api';
 
@@ -13,11 +14,17 @@ export default function LinkForm({ onSuccess }) {
       return;
     }
     try {
-      await api.post('/links', { url, titulo });
+      // 1) Captura a resposta para extrair o ID recém‑criado
+      const res = await api.post('/links', { url, titulo });
+      const { id } = res.data;
+
+      // 2) Reset dos campos
       setUrl('');
       setTitulo('');
       setErro('');
-      onSuccess && onSuccess({ url, titulo });
+
+      // 3) Chama onSuccess com os dados corretos
+      onSuccess && onSuccess({ id, url, titulo });
     } catch (err) {
       setErro(err.response?.data?.erro || 'Erro ao criar link');
     }

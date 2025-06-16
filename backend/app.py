@@ -393,61 +393,76 @@ logger = logging.getLogger(__name__)
 @app.route('/compare-reliability', methods=['POST'])
 @login_required
 def compare_reliability():
-    data  = request.get_json(force=True)
-    url   = data.get('url')
-    title = data.get('title')
+    data = request.get_json(force=True)
+    link_id = data.get('id')
+    url     = data.get('url')
+    title   = data.get('title')
+
     if not url or not title:
         return jsonify({'error': 'URL e título são obrigatórios'}), 400
 
-    # 1) Obter conteúdo da URL
+    link = Link.query.get(link_id)
+
+    # 1. Obter o conteúdo da URL
     try:
         resp = requests.get(url, timeout=15)
         resp.raise_for_status()
     except Exception as e:
-        logger.error(f"Falha ao buscar URL {url}: {e}")
-        return jsonify({'error': f'Não consegui buscar URL: {str(e)}'}), 500
+        logger.error(f"Erro ao buscar {url}: {e}")
+        return jsonify({'error': f'Erro ao buscar URL: {str(e)}'}), 500
 
-    # 2) Extrair texto bruto, limitando tamanho
+    # 2. Extrair texto da página
     soup = BeautifulSoup(resp.text, 'html.parser')
-    for tag in soup(['script','style']):
+    for tag in soup(['script', 'style']):
         tag.decompose()
     snippet = soup.get_text(separator=' ', strip=True)[:10000]
 
-    # 3) Montar payload conforme schema da Cortical
-    payload  = [
+    # 3. Preparar payload
+    payload = [
         {"text": title},
         {"text": snippet}
     ]
-    endpoint = f'https://api.cortical.io/nlp/compare'
+    cortical_url = 'https://api.cortical.io/nlp/compare'
 
-    # 4) Chamar a API
+    # 4. Chamar API de comparação
     try:
-        cortical = requests.post(endpoint, json=payload, timeout=20)
-        # Se Cortical retorna 422, trata como sem confiabilidade
+        cortical = requests.post(cortical_url, json=payload, timeout=20)
+
         if cortical.status_code == 422:
             logger.info(f"Cortical 422 para {url}: {cortical.text}")
-            return jsonify({'confiabilidade': None}), 200
+            if link:
+                link.confiabilidade = -1.0
+                db.session.commit()
+            return jsonify({'confiabilidade': -1}), 200
+
         cortical.raise_for_status()
-        body       = cortical.json()
+        body = cortical.json()
         similarity = body.get('similarity')
+
         if similarity is None:
-            raise ValueError(f"Resposta inesperada: {body}")
+            raise ValueError(f"Resposta inesperada da Cortical: {body}")
+
     except HTTPError as http_err:
         detail = getattr(cortical, 'text', str(http_err))
-        logger.error(f"Cortical Bad Request [{cortical.status_code}]: {detail}")
-        return jsonify({'error': 'Cortical Bad Request', 'detail': detail}), cortical.status_code
-    except Exception as e:
-        logger.error(f"Erro interno compare_reliability: {e}")
-        return jsonify({'error': 'Falha interna', 'detail': str(e)}), 500
+        if 'Language' in detail and 'not supported' in detail:
+            logger.warning(f"Linguagem não suportada para {url}")
+            if link:
+                link.confiabilidade = -1.0
+                db.session.commit()
+            return jsonify({'confiabilidade': -1}), 200
+        logger.error(f"HTTPError na API Cortical: {detail}")
+        return jsonify({'error': 'Erro da API Cortical', 'detail': detail}), 400
 
-    # 5) Persistir no banco
-    link = Link.query.get(data.get('id'))
-    if link and link.titulo:
+    except Exception as e:
+        logger.error(f"Erro interno no compare_reliability: {e}")
+        return jsonify({'error': 'Erro interno', 'detail': str(e)}), 500
+
+    # 5. Salvar confiabilidade no banco
+    if link:
         link.confiabilidade = float(similarity)
         db.session.commit()
 
     return jsonify({'confiabilidade': similarity}), 200
-
 
 
 if __name__ == '__main__':
@@ -457,5 +472,3 @@ if __name__ == '__main__':
     from os import environ
     port = int(environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
-
-

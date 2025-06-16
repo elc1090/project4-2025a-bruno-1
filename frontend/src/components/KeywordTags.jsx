@@ -74,7 +74,7 @@ export default function KeywordTags({ url, linkData }) {
       {tags.map((kw, i) => (
         <span
           key={i}
-          className="bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full text-xs font-medium"
+          className="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-sm font-medium"
         >
           {kw}
         </span>

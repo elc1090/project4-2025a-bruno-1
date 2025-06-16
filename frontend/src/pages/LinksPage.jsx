@@ -86,6 +86,9 @@ export default function LinksPage({ view }) {
             l.confiabilidade = val
           } catch (err) {
             console.error(`erro em compare-reliability ${l.url}:`, err)
+            // se 400/422, você já gravou -1 no back, recarregue o valor:
+            const fresh = await api.get(`${endpoint}/${l.id}`);
+            l.confiabilidade = fresh.data.confiabilidade;
           }
         }
       }))
@@ -149,30 +152,36 @@ export default function LinksPage({ view }) {
   const handleEditSubmit = async (e) => {
     e.preventDefault();
     const old = links.find(l => l.id === editingId);
-    const urlMudou = old.url !== editUrl;
+    const urlMudou    = old.url    !== editUrl;
+    const tituloMudou = old.titulo !== editTitulo;
+    const precisaResetar = urlMudou || tituloMudou;
 
     try {
-      // 1) atualiza URL e título
-      await api.put(`/links/${editingId}`, {
-        url: editUrl,
-        titulo: editTitulo
-      });
-
-      if (urlMudou) {
-        // 2) limpa no backend os campos de tags, language e confiabilidade
-        await api.put(`/links/${editingId}`, {
-          tags: [],          // vazio ou ['null']
-          language: null,
-          confiabilidade: null
-        });
-
-        // 3) limpa também no cache local
+      // 1) monta payload
+      const payload = { url: editUrl, titulo: editTitulo };
+      if (precisaResetar) {
+        payload.tags           = [];
+        payload.language       = null;
+        payload.confiabilidade = null;
         clearCachesForUrl(old.url, editUrl);
       }
 
+      // 2) atualiza no back
+      await api.put(`/links/${editingId}`, payload);
+
+      // 3) atualiza imediatamente o state local
+      setLinks(prev =>
+        prev.map(l =>
+          l.id === editingId
+            ? { ...l, url: editUrl, titulo: editTitulo, confiabilidade: null, tags: payload.tags ?? l.tags, language: payload.language ?? l.language }
+            : l
+        )
+      );
+
+      // 4) sai do modo de edição
       setEditingId(null);
 
-      // 4) recarrega tudo, agora com tags e language nulos para a nova URL
+      // 5) opcional: recarrega a lista completa (para outras views)
       await loadLinks();
     } catch (err) {
       console.error('Erro ao editar:', err);
@@ -247,8 +256,8 @@ return (
     <main className="flex-1 w-full px-4 md:px-6 lg:px-8 py-8 max-w-[1280px] mx-auto">
       {/* Formulário de criação */}
       <div className="bg-white rounded-lg shadow p-6 mb-10 border border-gray-200">
-        <LinkForm onSuccess={(data) => {
-          clearCachesForUrl(data.url)
+        <LinkForm onSuccess={({ id, url, titulo }) => {
+          clearCachesForUrl(url)
           loadLinks()
         }} />
       </div>
@@ -383,6 +392,7 @@ return (
                         url={l.url}
                         title={l.titulo}
                         linkId={l.id}
+                        initialScore={l.confiabilidade}
                         onUpdate={handleReliabilityUpdate}
                       />
                     </>
@@ -413,31 +423,36 @@ return (
         hasMore={visibleCount < filteredLinks.length}
         onClick={handleLoadMore}
       />
+      {/* Modal de denúncia */}    
       {showReportModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full">
-            <h3 className="text-xl font-semibold mb-4">Reportar link</h3>
-            <p className="mb-4 text-gray-700">Por que você quer reportar este link?</p>
-            <div className="space-y-2">
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full mx-4 animate-fade-in">
+            <h3 className="text-2xl font-bold text-gray-800 mb-4 text-center">Reportar Link</h3>
+            <p className="text-gray-600 mb-6 text-center">
+              Selecione o motivo para reportar este conteúdo:
+            </p>
+
+            <div className="grid gap-3">
               {['Fake News', 'Conteúdo Inapropriado', 'Link Quebrado', 'Outro'].map((reason) => (
                 <button
                   key={reason}
                   onClick={() => handleReportSubmit(reason)}
-                  className="w-full text-left px-4 py-2 bg-gray-800 hover:bg-gray-200 rounded"
+                  className="w-full px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg transition duration-150 ease-in-out text-sm font-medium"
                 >
                   {reason}
                 </button>
               ))}
             </div>
+
             <button
               onClick={closeReportModal}
-              className="mt-4 text-sm text-red-500 hover:underline"
+              className="mt-6 w-full text-sm text-gray-200 hover:text-gray-500 hover:underline transition"
             >
               Cancelar
             </button>
           </div>
         </div>
-        )}
+      )}
     </main>
 
     {/* FOOTER */}

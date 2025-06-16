@@ -1,61 +1,54 @@
-import { useEffect, useState, useRef } from 'react';
+// src/components/Reliability.jsx
+
+import { useEffect, useState } from 'react';
 import api from '../services/api';
 
+// opcional: expõe cache se precisar
 export const reliabilityCache = {};
 
-export default function Reliability({ url, title, linkId, onUpdate }) {
-  const [score, setScore] = useState(null);
+export default function Reliability({
+  linkId,
+  url,
+  title,
+  initialScore = null,
+  onUpdate
+}) {
+  const [score, setScore] = useState(initialScore);
   const [error, setError] = useState(false);
 
-  // ref pra garantir que só tentamos UMA vez
-  const hasTriedRef = useRef(false);
-
   useEffect(() => {
-    // se já tentou (sucesso ou erro), não faz nada
-    if (hasTriedRef.current) return;
+    // dispara sempre que montar e o score for null ou -1
+    if (score !== null && score !== -1) return;
 
-    hasTriedRef.current = true;
-
-    // 1) se tiver em cache local, usa direto
-    if (reliabilityCache[url] != null) {
-      setScore(reliabilityCache[url]);
-      onUpdate?.(linkId, reliabilityCache[url]);
-      return;
-    }
-
-    // 2) dispara a comparação
+    setError(false);
     api.post('/compare-reliability', { id: linkId, url, title })
       .then(res => {
-        const raw = res.data.confiabilidade;
-        const val = parseFloat(raw);
-        if (Number.isNaN(val)) {
-          throw new Error(`Inválido: ${raw}`);
-        }
-        reliabilityCache[url] = val;
+        const val = res.data.confiabilidade;
         setScore(val);
-        onUpdate?.(linkId, val);
-        // 3) persiste no backend
+        onUpdate(linkId, val);
+        // persiste no back
         return api.put(`/links/${linkId}`, { confiabilidade: val });
       })
       .catch(err => {
-        // anota erro e para por aqui
-        console.error(`erro ao calcular confiabilidade de ${url}:`,
-          err.response?.data || err.message || err);
+        console.error(`erro ao calcular confiabilidade de ${url}:`, err);
         setError(true);
       });
-    // ⬇️ array vazio: só corre uma vez, ao montar
-  }, []);
+  // reexecuta se linkId/url/title mudarem
+  }, [linkId, url, title]);
 
+  if (score === -1) {
+    return <span className="text-sm text-gray-500 italic">sem suporte</span>;
+  }
   if (error) {
-    return <span className="text-sm text-red-500"></span>;
+    return <span className="text-sm text-red-500 italic">erro ao calcular</span>;
   }
   if (score == null) {
     return <span className="text-sm text-gray-400">calculando…</span>;
   }
-  
-  // Definição de estilo e label
+
   const pct = score * 100;
-  let colorClass, label;
+  let colorClass = '';
+  let label = '';
   if (pct > 50) {
     colorClass = 'text-green-600';
     label = 'Confiável';
@@ -68,8 +61,11 @@ export default function Reliability({ url, title, linkId, onUpdate }) {
   }
 
   return (
-    <span className={`text-sm font-medium ${colorClass}`} title={`Confiabilidade: ${pct.toFixed(1)}%`}>
+    <span
+      className={`text-sm font-medium ${colorClass}`}
+      title={`Confiabilidade: ${pct.toFixed(1)}%`}
+    >
       {label} ({pct.toFixed(1)}%)
     </span>
-    );
+  );
 }
