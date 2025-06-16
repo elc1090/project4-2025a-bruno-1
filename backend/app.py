@@ -29,7 +29,7 @@ app.config.update(
 # permite que o front acesse o back e envie cookies de sessão
 CORS(app, supports_credentials=True, origins=[
     "http://localhost:5173",
-    "https://project3-2025a-bruno-backend.onrender.com"
+    "https://project3-2025a-bruno-frontend.onrender.com"
 ])
 
 # Usa DATABASE_URL do ambiente (Render, Railway etc). Em dev cai no .env:
