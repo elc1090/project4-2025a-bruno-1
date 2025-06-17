@@ -3,189 +3,118 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 export default function Header({ activeView, userEmail, onLogout }) {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [open, setOpen] = useState(false)
   const navigate = useNavigate()
 
+  const links = [
+    { id: 'all', label: 'Todos os Links', path: '/links' },
+    { id: 'mine', label: 'Meus Links', path: '/my-links' },
+    { id: 'favorites', label: 'Favoritos', path: '/favorites' }
+  ]
+
   return (
-    <header className="relative w-full bg-gradient-to-r from-blue-800 to-indigo-600 text-white shadow-xl">
-      <div className="max-w-[1280px] mx-auto flex items-center justify-between px-6 py-4">
-        {/* Logo + Título */}
+    <header className="sticky top-0 z-50 bg-gradient-to-r from-indigo-700 via-blue-600 to-purple-600 text-white shadow-lg">
+      <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-3">
+        {/* Logo + Title */}
         <div
-          className="flex items-center space-x-3 cursor-pointer"
+          className="flex items-center cursor-pointer space-x-4"
           onClick={() => navigate('/links')}
         >
-          <img
-            src="logo2.png"
-            alt="Logo Compartilha Info"
-            className="w-12 h-12 object-contain"
-          />
-          <span className="text-2xl sm:text-3xl font-extrabold tracking-wide">
+          <img src="logo2.png" alt="Logo" className="w-10 h-10 rounded-full shadow-md" />
+          <span className="text-2xl md:text-3xl font-bold tracking-tight">
             CompartilhaInfo
           </span>
         </div>
 
-        {/* -- Itens de Menu em Desktop -- */}
-        <nav className="hidden md2:flex items-center space-x-8">
-          <button
-            onClick={() => navigate('/links')}
-            className={`flex items-center space-x-1 uppercase text-sm font-medium transition duration-200 ${
-              activeView === 'all'
-                ? 'border-b-2 border-white pb-1'
-                : 'hover:text-gray-200'
-            }`}
-          >
-            <span>Todos os Links</span>
-          </button>
-          <button
-            onClick={() => navigate('/my-links')}
-            className={`flex items-center space-x-1 uppercase text-sm font-medium transition duration-200 ${
-              activeView === 'mine'
-                ? 'border-b-2 border-white pb-1'
-                : 'hover:text-gray-200'
-            }`}
-          >
-            <span>Meus Links</span>
-          </button>
-          <button
-            onClick={() => navigate('/favorites')}
-            className={`flex items-center space-x-1 uppercase text-sm font-medium transition duration-200 ${
-              activeView === 'favorites'
-                ? 'border-b-2 border-white pb-1'
-                : 'hover:text-gray-200'
-            }`}
-          >
-            <span>Favoritos</span>
-          </button>
-          <span className="ml-8 text-sm">
-            <strong className="text-indigo-200">{userEmail}</strong>
-          </span>
-          <button
-            onClick={onLogout}
-            className="flex items-center space-x-1 uppercase text-sm font-medium hover:text-gray-200 transition duration-200"
-          >
-            <span>Sair</span>
-          </button>    
+        {/* Desktop Nav: aparece somente em telas >=1080px */}
+        <nav className="hidden [@media(min-width:1080px)]:flex items-center space-x-6">
+          {links.map(({ id, label, path }) => (
+            <button
+              key={id}
+              onClick={() => navigate(path)}
+              className={`relative px-4 py-1 text-sm font-semibold uppercase rounded-lg transition-colors duration-200
+                ${activeView === id
+                  ? 'bg-indigo-800 text-white'
+                  : 'text-indigo-100 hover:bg-indigo-600 hover:text-white'
+                }`}
+            >
+              {label}
+            </button>
+          ))}
+          <div className="ml-6 flex items-center space-x-4">
+            <span className="text-indigo-200 text-sm">{userEmail}</span>
+            <button
+              onClick={onLogout}
+              className="px-3 py-1 text-sm font-medium uppercase rounded hover:bg-indigo-600 transition duration-200"
+            >
+              Sair
+            </button>
+          </div>
         </nav>
 
-        {/* -- Botão Hamburger (Mobile) -- */}
+        {/* Mobile Toggle: só aparece em telas <1080px */}
         <button
-          className="md2:hidden focus:outline-none z-20"
-          onClick={() => setIsMobileMenuOpen((prev) => !prev)}
+          className="[@media(min-width:1080px)]:hidden p-2 focus:outline-none"
+          onClick={() => setOpen(prev => !prev)}
         >
-          {isMobileMenuOpen ? (
-            <svg
-              className="w-8 h-8 text-white"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
+          {open ? (
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           ) : (
-            <svg
-              className="w-8 h-8 text-white"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 8h16M4 16h16"
-              />
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
             </svg>
           )}
         </button>
       </div>
 
-      {/* ==== MENU MOBILE FULLSCREEN OVERLAY ==== */}
-      {isMobileMenuOpen && (
+      {/* Mobile Menu Overlay */}
+      {open && (
         <>
-          {/* Fundo semitransparente */}
+          {/* Backdrop */}
           <div
-            className="fixed inset-0 bg-black bg-opacity-40 z-10"
-            onClick={() => setIsMobileMenuOpen(false)}
+            className="fixed inset-0 bg-black bg-opacity-50 z-40"
+            onClick={() => setOpen(false)}
           />
-          {/* Painel lateral */}
-          <div className="fixed inset-y-0 left-0 w-64 bg-white shadow-lg z-20 transform transition-transform duration-300">
-            <div className="flex items-center justify-between px-6 py-4 border-b">
-              <span className="text-xl font-bold text-gray-800">Menu</span>
-              <button onClick={() => setIsMobileMenuOpen(false)}>
-                <svg
-                  className="w-6 h-6 text-gray-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
+
+          {/* Sidebar */}
+          <div
+            className="fixed top-0 left-0 h-full w-64 bg-white shadow-xl z-50 p-6 transform transition-transform duration-300 ease-out"
+            style={{ transform: open ? 'translateX(0)' : 'translateX(-100%)' }}
+          >
+            <div className="flex items-center justify-between mb-8">
+              <span className="text-xl font-semibold text-gray-800">Menu</span>
+              <button onClick={() => setOpen(false)}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
-            <nav className="flex flex-col space-y-4 px-6 py-6">
-              <button
-                onClick={() => {
-                  navigate('/links')
-                  setIsMobileMenuOpen(false)
-                }}
-                className={`flex items-center space-x-2 text-gray-300 hover:text-indigo-600 transition duration-200 ${
-                  activeView === 'all' ? 'font-semibold' : ''
-                }`}
-              >
-                <span>Todos os Links</span>
-              </button>
 
-              <button
-                onClick={() => {
-                  navigate('/my-links')
-                  setIsMobileMenuOpen(false)
-                }}
-                className={`flex items-center space-x-2 text-gray-300 hover:text-indigo-600 transition duration-200 ${
-                  activeView === 'mine' ? 'font-semibold' : ''
-                }`}
-              >
-                <span>Meus Links</span>
-              </button>
+            <nav className="flex flex-col space-y-6">
+              {links.map(({ id, label, path }) => (
+                <button
+                  key={id}
+                  onClick={() => { navigate(path); setOpen(false) }}
+                  className={`text-lg font-medium transition-colors duration-200
+                    ${activeView === id
+                      ? 'text-indigo-700'
+                      : 'text-gray-300 hover:text-indigo-600'
+                    }`}
+                >
+                  {label}
+                </button>
+              ))}
 
-              <button
-                onClick={() => {
-                  navigate('/favorites')
-                  setIsMobileMenuOpen(false)
-                }}
-                className={`flex items-center space-x-2 text-gray-300 hover:text-indigo-600 transition duration-200 ${
-                  activeView === 'favorites' ? 'font-semibold' : ''
-                }`}
-              >
-                <span>Favoritos</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  onLogout()
-                  setIsMobileMenuOpen(false)
-                }}
-                className="flex items-center space-x-2 text-gray-300 hover:text-indigo-600 transition duration-200"
-              >
-                <span>Sair</span>
-              </button>
-
-              <div className="pt-6 border-t mt-4">
-                <span className="block text-gray-500 text-sm">
-                  <strong>{userEmail}</strong>
-                </span>
+              <div className="pt-6 border-t border-gray-200 mt-6">
+                <span className="block text-gray-600 mb-4">{userEmail}</span>
+                <button
+                  onClick={() => { onLogout(); setOpen(false) }}
+                  className="w-full text-left text-sm font-medium text-red-500 hover:text-red-600 transition"
+                >
+                  Sair
+                </button>
               </div>
             </nav>
           </div>

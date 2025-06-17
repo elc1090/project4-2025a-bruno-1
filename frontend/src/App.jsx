@@ -16,6 +16,9 @@ import LinksPage from './pages/LinksPage'
 import FavoritesPage from './pages/FavoritesPage'
 import Logout from './components/Logout'
 
+import PrivacyPolicy from './PrivacyPolicy';
+import TermsOfService from './TermsOfService';
+
 import { LoadingProvider, useLoading } from './utils/LoadingContext'
 import LoadingModal from './components/LoadingModal'
 
@@ -122,6 +125,9 @@ function AppRoutes({ isLogged, setIsLogged, userEmail, setUserEmail }) {
           element={<Logout onLogout={handleLogout} />}
         />
 
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="/terms-of-service" element={<TermsOfService />} />
+        
         {/* Qualquer outro caminho → login */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>

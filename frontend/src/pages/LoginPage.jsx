@@ -46,6 +46,10 @@ export default function LoginPage({ onLogin }) {
             Registrar
           </Link>
         </p>
+        <footer className="text-center py-5">
+          <a href="/privacy-policy" className="mx-2 underline text-gray-400">Política de Privacidade</a>
+          <a href="/terms-of-service" className="mx-2 underline text-gray-400">Termos de Serviço</a>
+        </footer>
       </div>
     </main>
   );
