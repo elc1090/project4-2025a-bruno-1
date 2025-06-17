@@ -16,35 +16,55 @@ import LinksPage from './pages/LinksPage'
 import FavoritesPage from './pages/FavoritesPage'
 import Logout from './components/Logout'
 
-import PrivacyPolicy from './PrivacyPolicy';
-import TermsOfService from './TermsOfService';
+import PrivacyPolicy from './PrivacyPolicy'
+import TermsOfService from './TermsOfService'
 
 import { LoadingProvider, useLoading } from './utils/LoadingContext'
 import LoadingModal from './components/LoadingModal'
 
 import './App.css'
 
-function AppRoutes({ isLogged, setIsLogged, userEmail, setUserEmail }) {
+// Componente de inicialização: faz um ping inicial para acordar o servidor
+function AppInitializer() {
+  const { setIsLoading } = useLoading()
+  useEffect(() => {
+    setIsLoading(true)
+    api.get('/')
+      .catch(() => {})
+      .finally(() => setIsLoading(false))
+  }, [setIsLoading])
+  return null
+}
+
+function AppRoutesWrapper() {
+  const [isLogged, setIsLogged] = useState(
+    Boolean(localStorage.getItem('loggedIn'))
+  )
+  const [userEmail, setUserEmail] = useState(
+    localStorage.getItem('userEmail') || ''
+  )
+
   const location = useLocation()
   const navigate = useNavigate()
-  const { setIsLoading } = useLoading()
 
-  // 1) Sincroniza isLogged se mudar em outra aba
+  // Sincroniza login entre abas
   useEffect(() => {
     const handleStorage = () => {
       setIsLogged(Boolean(localStorage.getItem('loggedIn')))
     }
     window.addEventListener('storage', handleStorage)
     return () => window.removeEventListener('storage', handleStorage)
-  }, [setIsLogged])
+  }, [])
 
-  // 2) Se veio de login Google (?google=ok), marca login, busca /me e redireciona
+  // Fluxo pós Google OAuth
+  const { setIsLoading } = useLoading()
   useEffect(() => {
     const params = new URLSearchParams(location.search)
     if (params.get('google') === 'ok') {
       localStorage.setItem('loggedIn', 'true')
       setIsLogged(true)
 
+      setIsLoading(true)
       api.get('/me')
         .then(res => {
           if (res.data.logged_in) {
@@ -62,16 +82,16 @@ function AppRoutes({ isLogged, setIsLogged, userEmail, setUserEmail }) {
           navigate('/links', { replace: true })
         })
     }
-  }, [location.search, setIsLogged, setUserEmail, navigate, setIsLoading])
+  }, [location.search, navigate])
 
-  // 3) determina activeView pelo pathname
+  // Determina tab ativa
   const path = location.pathname
   let activeView = ''
   if (path === '/links') activeView = 'all'
   else if (path === '/my-links') activeView = 'mine'
   else if (path === '/favorites') activeView = 'favorites'
 
-  // 4) Função de logout (remove localStorage e redireciona)
+  // Logout
   const handleLogout = () => {
     setIsLogged(false)
     localStorage.removeItem('loggedIn')
@@ -81,15 +101,13 @@ function AppRoutes({ isLogged, setIsLogged, userEmail, setUserEmail }) {
 
   return (
     <>
+      <LoadingModal visible={useLoading().isLoading} />
       <Routes>
-        {/* Registro, Login */}
         <Route path="/register" element={<RegisterPage />} />
         <Route
           path="/login"
           element={<LoginPage onLogin={() => setIsLogged(true)} />}
         />
-
-        {/* Páginas protegidas */}
         <Route
           path="/links"
           element={
@@ -114,7 +132,7 @@ function AppRoutes({ isLogged, setIsLogged, userEmail, setUserEmail }) {
           path="/favorites"
           element={
             isLogged ? (
-              <FavoritesPage onLogout={() => setIsLogged(false)} />
+              <FavoritesPage onLogout={handleLogout} />
             ) : (
               <Navigate to="/login" replace />
             )
@@ -124,11 +142,8 @@ function AppRoutes({ isLogged, setIsLogged, userEmail, setUserEmail }) {
           path="/logout"
           element={<Logout onLogout={handleLogout} />}
         />
-
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
         <Route path="/terms-of-service" element={<TermsOfService />} />
-        
-        {/* Qualquer outro caminho → login */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </>
@@ -136,22 +151,12 @@ function AppRoutes({ isLogged, setIsLogged, userEmail, setUserEmail }) {
 }
 
 export default function App() {
-  const [isLogged, setIsLogged] = useState(
-    Boolean(localStorage.getItem('loggedIn'))
-  )
-  const [userEmail, setUserEmail] = useState(
-    localStorage.getItem('userEmail') || ''
-  )
-
   return (
-    <BrowserRouter>
-      <LoadingModal visible={useLoading().isLoading} />
-      <AppRoutes
-        isLogged={isLogged}
-        setIsLogged={setIsLogged}
-        userEmail={userEmail}
-        setUserEmail={setUserEmail}
-      />
-    </BrowserRouter>
+    <LoadingProvider>
+      <BrowserRouter>
+        <AppInitializer />
+        <AppRoutesWrapper />
+      </BrowserRouter>
+    </LoadingProvider>
   )
 }
