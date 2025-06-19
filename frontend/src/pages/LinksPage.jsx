@@ -338,82 +338,84 @@ return (
             const isFav = favoritedIds.has(l.id);
             return (
               <div
-                key={l.id}
-                className="bg-white p-6 rounded-lg shadow-md border border-gray-200"
+              key={l.id}
+              className="bg-white p-6 rounded-lg shadow-md border border-gray-200"
+              title={l.titulo ? l.titulo : l.url}
               >
-                  {/* Título + Botões de “favoritar” e “reportar” */}
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-semibold text-gray-800">
-                    {l.titulo}
-                  </h3>
+                {/* Título + Botões de “favoritar” e “reportar” */}
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-semibold text-gray-800">
+                {l.titulo}
+                </h3>
 
-                  <div className="flex items-center space-x-2">
-                    {/* Ícone de favoritar / desfavoritar */}
-                    <button
-                      onClick={() => handleToggleFavorite(l.id)}
-                      title={isFav ? 'Desfavoritar' : 'Adicionar aos Favoritos'}
-                      className="text-lg text-yellow-600 hover:text-yellow-800 p-1 bg-transparent border-none outline-none"
-                    >
-                      {isFav ? '★' : '☆'}
-                    </button>
-
-                    {/* Botão de denúncia */}
-                    <button
-                      onClick={() => openReportModal(l)}
-                      title="Reportar"
-                      className="text-lg text-red-500 hover:text-red-700 p-1 bg-transparent border-none outline-none"
-                    >
-                      📢
-                    </button>
-                  </div>
-                </div>
-                <a
-                  href={l.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block text-indigo-700 mt-3 truncate hover:underline"
+                <div className="flex items-center space-x-2">
+                {/* Ícone de favoritar / desfavoritar */}
+                <button
+                  onClick={() => handleToggleFavorite(l.id)}
+                  title={isFav ? 'Desfavoritar' : 'Adicionar aos Favoritos'}
+                  className="text-lg text-yellow-600 hover:text-yellow-800 p-1 bg-transparent border-none outline-none"
                 >
-                  {l.url}
-                </a>
-                {l.titulo && l.url && (<KeywordTags url={l.url} linkData={l} />)}
-                <div className="flex justify-between text-sm text-gray-500 mt-4">
-                  <span>{addedAt}</span>
-                  <span>{authorName}</span>
-                  {l.titulo && l.url && (
-                    <>
-                      <LanguageDetection
-                        key={`lang-${l.id}-${l.url}`}
-                        url={l.url}
-                        linkId={l.id}
-                        onLanguage={() => {}}
-                      />
-                      <Reliability
-                        key={`rel-${l.id}-${l.url}-${l.titulo}`}
-                        url={l.url}
-                        title={l.titulo}
-                        linkId={l.id}
-                        initialScore={l.confiabilidade}
-                        onUpdate={handleReliabilityUpdate}
-                      />
-                    </>
-                  )}
+                  {isFav ? '★' : '☆'}
+                </button>
+
+                {/* Botão de denúncia */}
+                <button
+                  onClick={() => openReportModal(l)}
+                  title="Reportar"
+                  className="text-lg text-red-500 hover:text-red-700 p-1 bg-transparent border-none outline-none"
+                >
+                  📢
+                </button>
                 </div>
-                {view === 'mine' && (
-                  <div className="flex justify-end space-x-4 mt-4">
-                    <button
-                      onClick={() => handleEditClick(l)}
-                      className="text-green-600 hover:text-green-800"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => handleDelete(l.id)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      Excluir
-                    </button>
-                  </div>
+              </div>
+              <a
+                href={l.url}
+                target="_blank"
+                rel="noreferrer"
+                className="block text-indigo-700 mt-3 truncate hover:underline"
+                title={l.url}
+              >
+                {l.url}
+              </a>
+              {l.titulo && l.url && (<KeywordTags url={l.url} linkData={l} />)}
+              <div className="flex justify-between text-sm text-gray-500 mt-4">
+                <span title={'Data/hora de adição'}>{addedAt}</span>
+                <span title={'Autor'}>{authorName}</span>
+                {l.titulo && l.url && (
+                <>
+                  <LanguageDetection
+                  key={`lang-${l.id}-${l.url}`}
+                  url={l.url}
+                  linkId={l.id}
+                  onLanguage={() => {}}
+                  />
+                  <Reliability
+                  key={`rel-${l.id}-${l.url}-${l.titulo}`}
+                  url={l.url}
+                  title={l.titulo}
+                  linkId={l.id}
+                  initialScore={l.confiabilidade}
+                  onUpdate={handleReliabilityUpdate}
+                  />
+                </>
                 )}
+              </div>
+              {view === 'mine' && (
+                <div className="flex justify-end space-x-4 mt-4">
+                <button
+                  onClick={() => handleEditClick(l)}
+                  className="text-green-600 hover:text-green-800"
+                >
+                  Editar
+                </button>
+                <button
+                  onClick={() => handleDelete(l.id)}
+                  className="text-red-600 hover:text-red-800"
+                >
+                  Excluir
+                </button>
+                </div>
+              )}
               </div>
             );
           })}

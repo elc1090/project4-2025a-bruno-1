@@ -31,7 +31,7 @@ export default function LinkForm({ onSuccess }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="mb-6">
+    <form onSubmit={handleSubmit} className="mb-6 w-full px-4 sm:px-0 max-w-2xl md:max-w-3xl mx-auto">
       {erro && <div className="text-red-500 mb-2">{erro}</div>}
       <div className="flex space-x-2">
         <input
@@ -39,18 +39,18 @@ export default function LinkForm({ onSuccess }) {
           placeholder="URL"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          className="flex-1 p-2 border rounded"
+          className="flex-1 min-w-0 w-full p-3 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <input
           type="text"
           placeholder="Título"
           value={titulo}
           onChange={(e) => setTitulo(e.target.value)}
-          className="flex-1 p-2 border rounded"
+          className="flex-1 min-w-0 w-full p-3 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <button
           type="submit"
-          className="px-4 bg-blue-900 text-white rounded hover:bg-blue-950"
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           Adicionar
         </button>

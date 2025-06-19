@@ -1,7 +1,10 @@
 // src/components/SearchFiltered.jsx
+import InfoModal from './InfoModal'
 export default function SearchFiltered({ searchTerm, onSearchTermChange, onClear }) {
   return (
     <div className="w-full max-w-[1280px] mx-auto px-6 py-4 flex items-center space-x-4">
+      {/* Botão de info */}
+      <InfoModal />
       <input
         type="text"
         placeholder="Buscar por título, autor, data ou tags…"

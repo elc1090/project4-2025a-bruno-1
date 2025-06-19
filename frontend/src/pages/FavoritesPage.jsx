@@ -178,8 +178,8 @@ export default function FavoritesPage({ onLogout }) {
                   {l.titulo && l.url && (<KeywordTags url={l.url} linkData={l} />)}
 
                   <div className="flex justify-between text-sm text-gray-500 mt-4">
-                    <span>{addedAt}</span>
-                    <span>{authorName}</span>
+                    <span title={'Data/hora de adição'}>{addedAt}</span>
+                    <span title={'Autor'}>{authorName}</span>
                     {l.titulo && l.url && (
                       <>
                         <LanguageDetection

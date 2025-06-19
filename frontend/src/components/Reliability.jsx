@@ -64,7 +64,7 @@ export default function Reliability({
       className={`text-sm font-medium ${colorClass}`}
       title={`Confiabilidade: ${pct.toFixed(1)}%`}
     >
-      {label} ({pct.toFixed(1)}%)
+      {label}
     </span>
   );
 }
