@@ -24,6 +24,12 @@ Foi desenvolvida uma aplicação web de **compartilhamento de links noticiosos**
 - Possibilidade de **reportar** links com motivos (fake news, conteúdo impróprio, etc.)
 - Paginação com "Ver mais" (inicialmente mostra 6 links e permite expandir)
 - Visual organizado com grid de cards e navegação clara
+- Integração com a API Cortical.io para:
+   - Extração de tags/keywords via IA semântica
+   - Detecção de idioma de forma automática
+   - Comparação de confiabilidade entre título e conteúdo
+- Login federado com Google (OAuth 2.0) — permite autenticação via conta Google
+
 
 A aplicação está alinhada com a temática "Compartilhamento", permitindo aos usuários contribuírem e organizarem links de notícias relevantes em uma plataforma comum.
 
@@ -37,7 +43,9 @@ O desenvolvimento foi dividido em:
 2. **Configuração do backend** com Flask + SQLAlchemy + MySQL.
 3. **Criação de modelos de dados** e APIs REST para links e favoritos.
 4. **Frontend em React com Tailwind CSS** usando Vite para build e hot-reload.
-5. **Integração entre frontend e backend** com sessões, cookies e autenticação.
+5. **Integração entre frontend e backend** com sessões, cookies e autenticação, incluindo:
+    - Login federado via Google OAuth  
+    - Chamadas à API Cortical.io para análises de linguagem e confiabilidade
 6. **Deploy completo** no Render com backend Python e frontend React servidos separadamente.
 7. **Refinamento de layout**, responsividade e adição de interatividade (favoritos, filtros, modais).
 
@@ -57,6 +65,8 @@ O desenvolvimento foi dividido em:
 - Tailwind CSS
 - Render (deploy)
 - Gunicorn
+- Authlib (Flask) e OAuth 2.0 (Google Sign‑In)
+- Integração com API Cortical.io (IA de processamento de linguagem)
 
 ---
 
@@ -79,6 +89,8 @@ O desenvolvimento foi dividido em:
 - [TailwindCSS](https://tailwindcss.com/docs)
 - [Render – Deploy Flask + React](https://render.com/docs/deploy-flask)
 - [Railway – Banco de dados MySQL online](https://railway.app/)
+- [Cortical.io – API de NLP e IA semântica](https://cortical.io/)
+- [Documentação Google Identity Platform](https://developers.google.com/identity)
 - Ícones usados do Unicode (★ e 🛑)
 - Agradecimentos ao suporte do ChatGPT com:
   - Configuração de CORS e cookies cross-origin
